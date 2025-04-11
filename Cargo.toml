@@ -1,0 +1,28 @@
+[workspace]
+members = [
+    #
+    "chitchat",
+    "gossip",
+    "tls_rpk",
+]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+
+[workspace.dependencies]
+anyhow = "1.0"
+async-trait = "0.1"
+hex = "0.4"
+opentelemetry = { version = "0.28", features = ["metrics", "trace"] }
+opentelemetry-otlp = { version = "0.28", features = ["grpc-tonic", "http-proto", "metrics", "trace"] }
+opentelemetry_sdk = { version = "0.28", features = ["rt-tokio"] }
+poem = "3.1"
+poem-openapi = { version = "5.1", features = ["swagger-ui"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+tokio = { version = "1.44", features = ["macros", "net", "rt-multi-thread", "time"] }
+tracing = "0.1"
+tracing-opentelemetry = "0.29"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+wtransport = { version = "0.6", features = ["dangerous-configuration", "quinn"] }

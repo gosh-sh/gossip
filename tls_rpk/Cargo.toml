@@ -1,0 +1,13 @@
+[package]
+name = "tls_rpk"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow = "1"
+ed25519-dalek = { version = "2.1.1", features = ["alloc", "pem", "pkcs8", "rand_core", "serde"] }
+rand = "*"
+rustls = "*"
+
+[dev-dependencies]
+ed25519-dalek = { version = "2.1.1", features = ["serde", "rand_core", "alloc", "pkcs8", "zeroize"] }
