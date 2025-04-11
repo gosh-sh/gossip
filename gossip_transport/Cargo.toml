@@ -1,0 +1,15 @@
+[package]
+name = "gossip_transport"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+chitchat.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+wtransport.workspace = true
+
+async-channel = "2.3"
+ed25519-dalek = { version = "2.1.1", features = ["serde", "rand_core"] }

@@ -2,7 +2,7 @@
 members = [
     #
     "chitchat",
-    "gossip",
+    "gossip_transport",
     "tls_rpk",
 ]
 resolver = "3"
@@ -26,3 +26,5 @@ tracing = "0.1"
 tracing-opentelemetry = "0.29"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 wtransport = { version = "0.6", features = ["dangerous-configuration", "quinn"] }
+
+chitchat = { path = "chitchat" }

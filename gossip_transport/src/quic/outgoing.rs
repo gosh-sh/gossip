@@ -13,7 +13,7 @@ use tracing::warn;
 use wtransport::Connection;
 use wtransport::endpoint::endpoint_side::Client;
 
-use crate::transport::channel::OutgoingMessage;
+use crate::channel::OutgoingMessage;
 
 struct ClientConnectionPool {
     public_addr: SocketAddr,

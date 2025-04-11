@@ -17,8 +17,8 @@ use wtransport::quinn::TransportConfig;
 use wtransport::quinn::VarInt;
 use wtransport::tls::server::build_default_tls_config;
 
-use crate::transport::channel::IncomingMessage;
-use crate::transport::quic::CHANNEL_CAPACITY;
+use crate::channel::IncomingMessage;
+use crate::quic::CHANNEL_CAPACITY;
 
 pub async fn run(
     socket: UdpSocket,
