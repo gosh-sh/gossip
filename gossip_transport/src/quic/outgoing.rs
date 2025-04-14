@@ -74,9 +74,11 @@ pub async fn run(
     //     // .max_idle_timeout(Some(Duration::from_secs(3)))?
     //     .build();
 
+    tracing::info!("Starting gossip transport with config: {:?}", client_config);
     let client_endpoint = wtransport::Endpoint::client(client_config)
         .with_context(|| "failed to build quic client")?;
 
+    tracing::info!("Public address: {}", public_addr);
     let mut connection_pool = ClientConnectionPool::new(public_addr, signing_key, client_endpoint);
 
     async fn inner(
