@@ -7,7 +7,22 @@ on:
     branches: [ "main" ]
 
 env:
+  # Disable incremental compilation to ensure clean builds
+  CARGO_INCREMENTAL: 0
+  # Use git CLI for fetching dependencies instead of libgit2
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+  # Number of retries for network requests
+  CARGO_NET_RETRY: 10
+  # Enable colored output in cargo
   CARGO_TERM_COLOR: always
+  # Show full backtrace on panics
+  RUST_BACKTRACE: 1
+  # # Treat documentation warnings as errors
+  # RUSTDOCFLAGS: -D warnings
+  # # Treat compiler warnings as errors
+  # RUSTFLAGS: -D warnings
+  # Maximum number of retries for rustup commands
+  RUSTUP_MAX_RETRIES: 10
 
 jobs:
   test:
