@@ -6,7 +6,7 @@ edition.workspace = true
 [dependencies]
 anyhow = "1"
 ed25519-dalek = { version = "2.1.1", features = ["alloc", "pem", "pkcs8", "rand_core", "serde"] }
-rand = "*"
+rand = "0.8.5"
 rustls = "*"
 
 [dev-dependencies]

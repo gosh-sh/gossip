@@ -1,0 +1,73 @@
+name: Rust CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  # Disable incremental compilation to ensure clean builds
+  CARGO_INCREMENTAL: 0
+  # Use git CLI for fetching dependencies instead of libgit2
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+  # Number of retries for network requests
+  CARGO_NET_RETRY: 10
+  # Enable colored output in cargo
+  CARGO_TERM_COLOR: always
+  # Show full backtrace on panics
+  RUST_BACKTRACE: 1
+  # # Treat documentation warnings as errors
+  # RUSTDOCFLAGS: -D warnings
+  # # Treat compiler warnings as errors
+  # RUSTFLAGS: -D warnings
+  # Maximum number of retries for rustup commands
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  test:
+    name: cargo test
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: taiki-e/checkout-action@v1
+      - name: Install Rust
+        uses: taiki-e/github-actions/install-rust@nightly
+      - env:
+          # INFO logs spams a lot
+          RUST_LOG: warn
+        run: cargo test --workspace --all-features --release
+
+  bench:
+    name: cargo bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: taiki-e/checkout-action@v1
+      - name: Install Rust
+        uses: taiki-e/github-actions/install-rust@nightly
+      - run: cargo bench --workspace
+
+  clippy:
+    name: cargo clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: taiki-e/checkout-action@v1
+      - name: Install Rust
+        uses: taiki-e/github-actions/install-rust@nightly
+        with:
+          component: clippy
+      - run: cargo clippy --workspace --all-features --lib --bins --tests --examples
+
+  fmt:
+    name: cargo fmt
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: taiki-e/checkout-action@v1
+      - name: Install Rust
+        uses: taiki-e/github-actions/install-rust@nightly
+        with:
+          component: rustfmt
+      - run: cargo fmt --all -- --check
