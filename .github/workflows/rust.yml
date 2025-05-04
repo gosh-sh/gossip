@@ -1,0 +1,54 @@
+name: Rust CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: taiki-e/checkout-action@v1
+      - name: Install Rust
+        uses: taiki-e/github-actions/install-rust@nightly
+      - run: cargo test --workspace --all-features --release
+
+  bench:
+    name: cargo bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: taiki-e/checkout-action@v1
+      - name: Install Rust
+        uses: taiki-e/github-actions/install-rust@nightly
+      - run: cargo bench --workspace
+
+  clippy:
+    name: cargo clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: taiki-e/checkout-action@v1
+      - name: Install Rust
+        uses: taiki-e/github-actions/install-rust@nightly
+        with:
+          component: clippy
+      - run: cargo clippy --workspace --all-features --lib --bins --tests --examples
+
+  fmt:
+    name: cargo fmt
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: taiki-e/checkout-action@v1
+      - name: Install Rust
+        uses: taiki-e/github-actions/install-rust@nightly
+        with:
+          component: rustfmt
+      - run: cargo fmt --all -- --check
