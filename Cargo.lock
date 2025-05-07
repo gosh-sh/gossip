@@ -614,7 +614,9 @@ dependencies = [
  "ed25519-dalek",
  "rand 0.8.5",
  "tokio",
+ "tokio-stream",
  "tracing",
+ "tracing-subscriber",
  "wtransport",
 ]
 
