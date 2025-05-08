@@ -37,8 +37,8 @@ pub async fn run(
         .with_bind_socket(socket)
         // .with_custom_tls_and_transport(tls_config, quic_transport_config)
         .with_custom_tls_and_transport(tls_config, quic_transport_config)
-        .keep_alive_interval(Some(Duration::from_millis(1500)))
-        .max_idle_timeout(Some(Duration::from_millis(3000)))?
+        .keep_alive_interval(Some(Duration::from_millis(15000)))
+        .max_idle_timeout(Some(Duration::from_millis(30000)))?
         // .with_identity(identity)
         // .with_custom_tls(tls_config)
         .build();

@@ -124,7 +124,7 @@ async fn spawn_quic_transport(ip_addr: String, base_port: u16, n: usize) -> Vec<
 
 #[tokio::test]
 async fn test_delay_before_dead_detection_10() {
-    let _ = tracing_subscriber::fmt::try_init();
+    // let _ = tracing_subscriber::fmt::try_init();
     let count = 10;
     let base_port = 10000;
     let base_ip_addr = "127.0.0.1".to_string();
@@ -145,9 +145,9 @@ async fn test_delay_before_dead_detection_10() {
 }
 
 #[tokio::test]
-async fn test_delay_before_dead_detection_20() {
-    let _ = tracing_subscriber::fmt::try_init();
-    let count = 20;
+async fn test_delay_before_dead_detection_40() {
+    // let _ = tracing_subscriber::fmt::try_init();
+    let count = 40;
     let base_port = 20000;
     let base_ip_addr = "127.0.0.1".to_string();
     let transports = spawn_quic_transport(base_ip_addr, base_port, count).await;
