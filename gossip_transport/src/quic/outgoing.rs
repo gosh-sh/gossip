@@ -86,30 +86,31 @@ pub async fn run(
         to_addr: SocketAddr,
         message: ChitchatMessage,
     ) -> anyhow::Result<()> {
-        // try use cached connection
-        // let connection = connection_pool
-        //     .get_or_create_connection(to_addr)
-        //     .await
-        //     .with_context(|| "failed to create connection")?;
         let instant = Instant::now();
-        let connection = connection_pool.create_connection(to_addr).await?;
+        // try use cached connection
+        let connection = connection_pool
+            .get_or_create_connection(to_addr)
+            .await
+            .with_context(|| "failed to create connection")?;
+        // let connection = connection_pool.create_connection(to_addr).await?;
         let elapsed = instant.elapsed();
         info!(elapsed = ?elapsed, "create connection");
 
         info!(open_connections = connection_pool.open_connections(), "open connections");
 
         let instant = Instant::now();
-        handle_send(&connection, connection_pool.public_addr, &message).await?;
+        // handle_send(&connection, connection_pool.public_addr, &message).await?;
+        if let Err(err) = handle_send(&connection, connection_pool.public_addr, &message)
+            .await
+            .with_context(|| "failed to send message")
+        {
+            // force reconnect
+            tracing::warn!(%err, "failed to send message reconnect");
+            let connection = connection_pool.create_connection(to_addr).await?;
+            handle_send(&connection, connection_pool.public_addr, &message).await?;
+        }
         let elapsed = instant.elapsed();
         info!(elapsed = ?elapsed, destination = ?to_addr, "message sent");
-        // if let Err(err) =
-        //     handle_send(&connection, &message).await.with_context(|| "failed to send message")
-        // {
-        //     // force reconnect
-        //     tracing::warn!(%err, "failed to send message reconnect");
-        //     let connection = connection_pool.create_connection(to_addr).await?;
-        //     handle_send(&connection, &message).await?;
-        // }
         Ok(())
     }
 
