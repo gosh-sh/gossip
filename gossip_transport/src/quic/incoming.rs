@@ -11,11 +11,11 @@ use tokio::io::AsyncReadExt;
 use tokio::task::JoinSet;
 use tracing::error;
 use tracing::info;
-use wtransport::Identity;
 use wtransport::endpoint::IncomingSession;
 use wtransport::quinn::TransportConfig;
 use wtransport::quinn::VarInt;
 use wtransport::tls::server::build_default_tls_config;
+use wtransport::{Connection, Identity};
 
 use crate::channel::IncomingMessage;
 use crate::quic::CHANNEL_CAPACITY;
@@ -26,6 +26,7 @@ pub async fn run(
 ) -> anyhow::Result<()> {
     // let tls_config = tls_rpk::server::make_config("test-ca/key.pem", "test-ca/public.pem");
     let identity = Identity::self_signed(["localhost"])?;
+    let local_addr = socket.local_addr()?.to_string();
 
     let mut quic_transport_config = TransportConfig::default();
     quic_transport_config.max_concurrent_uni_streams(VarInt::from_u32(1_000));
@@ -73,7 +74,10 @@ pub async fn run(
     join_set.spawn(async move {
         loop {
             let incoming_session = server_endpoint.accept().await;
-            tracing::warn!("QUIC incoming session");
+            tracing::warn!(
+                local_addr = local_addr.as_str(),
+                remote_addr = %incoming_session.remote_address(),
+                "QUIC incoming session");
             incoming_session_s
                 .send(incoming_session)
                 .await
@@ -118,35 +122,54 @@ async fn handle_incoming_session(
     info!("new connection from {from_addr}");
     let connection = session_request.accept().await?;
 
-    let mut uni_stream = connection.accept_uni().await?;
-    let mut uni_buf = Vec::new();
-    uni_stream.read_to_end(&mut uni_buf).await?;
-
-    let len = uni_buf.len();
-
-    let buf: &mut &[u8] = &mut uni_buf.as_slice();
-    let real_from_addr = SocketAddr::deserialize(buf)?;
-    tracing::warn!("{from_addr:>20} {real_from_addr:>20}: got {len} bytes");
-    let message = ChitchatMessage::deserialize(buf)?;
-
-    if incoming_messages.sender_count() > 100 || incoming_messages.len() > CHANNEL_CAPACITY / 2 {
-        // !!!
-        // TODO: workaround for case when incoming messages are stuck
-        error!("Too many incoming messages");
-        std::process::exit(1);
-    }
-
-    info!(
-        "sending for processing {:?} sender_count {} sender_len {}",
-        start.elapsed(),
-        incoming_messages.sender_count(),
-        incoming_messages.len(),
-    );
-
-    let message =
-        IncomingMessage { received_at: Instant::now(), from_addr: real_from_addr, message };
-    incoming_messages.send(message).await?;
-    info!("sent for processing {:?}", start.elapsed());
+    tokio::spawn(async move {
+        match handle_incoming_connection(incoming_messages, start, from_addr, connection).await {
+            Ok(()) => {}
+            Err(err) => {
+                tracing::warn!(%err, "incoming connection closed");
+            }
+        }
+    });
 
     Ok(())
+}
+
+async fn handle_incoming_connection(
+    incoming_messages: Sender<IncomingMessage>,
+    start: Instant,
+    from_addr: SocketAddr,
+    connection: Connection,
+) -> anyhow::Result<()> {
+    loop {
+        let mut uni_stream = connection.accept_uni().await?;
+        let mut uni_buf = Vec::new();
+        uni_stream.read_to_end(&mut uni_buf).await?;
+
+        let len = uni_buf.len();
+
+        let buf: &mut &[u8] = &mut uni_buf.as_slice();
+        let real_from_addr = SocketAddr::deserialize(buf)?;
+        tracing::warn!("{from_addr:>20} {real_from_addr:>20}: got {len} bytes");
+        let message = ChitchatMessage::deserialize(buf)?;
+
+        if incoming_messages.sender_count() > 1000 || incoming_messages.len() > CHANNEL_CAPACITY / 2
+        {
+            // !!!
+            // TODO: workaround for case when incoming messages are stuck
+            error!("Too many incoming messages");
+            // std::process::exit(1);
+        }
+
+        info!(
+            "sending for processing {:?} sender_count {} sender_len {}",
+            start.elapsed(),
+            incoming_messages.sender_count(),
+            incoming_messages.len(),
+        );
+
+        let message =
+            IncomingMessage { received_at: Instant::now(), from_addr: real_from_addr, message };
+        incoming_messages.send(message).await?;
+        info!("sent for processing {:?}", start.elapsed());
+    }
 }

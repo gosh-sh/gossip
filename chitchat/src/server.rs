@@ -36,7 +36,7 @@ const GOSSIP_COUNT: usize = 3;
 pub struct ChitchatHandle {
     chitchat_id: ChitchatId,
     command_tx: UnboundedSender<Command>,
-    chitchat: Arc<Mutex<Chitchat>>,
+    chitchat: Arc<std::sync::Mutex<Chitchat>>,
     pub join_handle: JoinHandle<Result<(), anyhow::Error>>,
 }
 
@@ -149,7 +149,7 @@ pub async fn spawn_chitchat(
     let chitchat_id = config.chitchat_id.clone();
 
     let chitchat = Chitchat::with_chitchat_id_and_seeds(config, seed_addrs, initial_key_values);
-    let chitchat_arc = Arc::new(Mutex::new(chitchat));
+    let chitchat_arc = Arc::new(std::sync::Mutex::new(chitchat));
     let chitchat_arc_clone = chitchat_arc.clone();
 
     let join_handle = tokio::spawn(async move {
@@ -164,7 +164,7 @@ impl ChitchatHandle {
         &self.chitchat_id
     }
 
-    pub fn chitchat(&self) -> Arc<Mutex<Chitchat>> {
+    pub fn chitchat(&self) -> Arc<std::sync::Mutex<Chitchat>> {
         self.chitchat.clone()
     }
 
@@ -173,7 +173,7 @@ impl ChitchatHandle {
     where
         F: FnMut(&mut Chitchat) -> T,
     {
-        let mut chitchat = self.chitchat.lock().await;
+        let mut chitchat = self.chitchat.lock().unwrap();
         fun(&mut chitchat)
     }
 
@@ -193,7 +193,7 @@ impl ChitchatHandle {
 /// UDP server for Chitchat communication.
 struct Server {
     command_rx: UnboundedReceiver<Command>,
-    chitchat: Arc<Mutex<Chitchat>>,
+    chitchat: Arc<std::sync::Mutex<Chitchat>>,
     transport: Box<dyn Socket>,
     rng: SmallRng,
 }
@@ -201,7 +201,7 @@ struct Server {
 impl Server {
     async fn new(
         command_rx: UnboundedReceiver<Command>,
-        chitchat: Arc<Mutex<Chitchat>>,
+        chitchat: Arc<std::sync::Mutex<Chitchat>>,
         transport: Box<dyn Socket>,
     ) -> Self {
         let rng = SmallRng::from_rng(thread_rng()).expect("failed to seed random generator");
@@ -210,7 +210,7 @@ impl Server {
 
     /// Listen for new Chitchat messages.
     async fn run(&mut self) -> anyhow::Result<()> {
-        let gossip_interval = self.chitchat.lock().await.config.gossip_interval;
+        let gossip_interval = { self.chitchat.lock().unwrap().config.gossip_interval };
         let mut gossip_interval = time::interval(gossip_interval);
         loop {
             tokio::select! {
@@ -255,7 +255,7 @@ impl Server {
     ) -> anyhow::Result<()> {
         // Handle gossip message from other servers.
         let response = {
-            let mut chitchat_guard = self.chitchat.lock().await;
+            let mut chitchat_guard = self.chitchat.lock().unwrap();
             let now = time::Instant::now();
             let response = chitchat_guard.process_message(message);
             tracing::trace!("Processing message took {:?}", now.elapsed());
@@ -271,36 +271,44 @@ impl Server {
     /// Gossip to multiple randomly chosen nodes.
     async fn gossip_multiple(&mut self) {
         // Gossip with live nodes & probabilistically include a random dead node
-        let mut chitchat_guard = self.chitchat.lock().await;
-        let cluster_state = chitchat_guard.cluster_state();
+        let (selected_nodes, random_dead_node_opt, random_seed_node_opt) = {
+            let mut chitchat_guard = self.chitchat.lock().unwrap();
+            let cluster_state = chitchat_guard.cluster_state();
 
-        let peer_nodes = cluster_state
-            .nodes()
-            .filter(|chitchat_id| *chitchat_id != chitchat_guard.self_chitchat_id())
-            .map(|chitchat_id| chitchat_id.gossip_advertise_addr)
-            .collect::<HashSet<_>>();
-        let live_nodes = chitchat_guard
-            .live_nodes()
-            .filter(|chitchat_id| *chitchat_id != chitchat_guard.self_chitchat_id())
-            .map(|chitchat_id| chitchat_id.gossip_advertise_addr)
-            .collect::<HashSet<_>>();
-        let dead_nodes = chitchat_guard
-            .dead_nodes()
-            .map(|chitchat_id| chitchat_id.gossip_advertise_addr)
-            .collect::<HashSet<_>>();
-        let seed_nodes: HashSet<SocketAddr> = chitchat_guard
-            .seed_nodes()
-            .into_iter()
-            .filter(|addr| *addr != chitchat_guard.self_chitchat_id().gossip_advertise_addr)
-            .collect();
-        let (selected_nodes, random_dead_node_opt, random_seed_node_opt) =
-            select_nodes_for_gossip(&mut self.rng, peer_nodes, live_nodes, dead_nodes, seed_nodes);
+            let peer_nodes = cluster_state
+                .nodes()
+                .filter(|chitchat_id| *chitchat_id != chitchat_guard.self_chitchat_id())
+                .map(|chitchat_id| chitchat_id.gossip_advertise_addr)
+                .collect::<HashSet<_>>();
+            let live_nodes = chitchat_guard
+                .live_nodes()
+                .filter(|chitchat_id| *chitchat_id != chitchat_guard.self_chitchat_id())
+                .map(|chitchat_id| chitchat_id.gossip_advertise_addr)
+                .collect::<HashSet<_>>();
+            let dead_nodes = chitchat_guard
+                .dead_nodes()
+                .map(|chitchat_id| chitchat_id.gossip_advertise_addr)
+                .collect::<HashSet<_>>();
+            let seed_nodes: HashSet<SocketAddr> = chitchat_guard
+                .seed_nodes()
+                .into_iter()
+                .filter(|addr| *addr != chitchat_guard.self_chitchat_id().gossip_advertise_addr)
+                .collect();
+            let result = select_nodes_for_gossip(
+                &mut self.rng,
+                peer_nodes,
+                live_nodes,
+                dead_nodes,
+                seed_nodes,
+            );
 
-        chitchat_guard.update_self_heartbeat();
-        chitchat_guard.gc_keys_marked_for_deletion();
+            chitchat_guard.update_self_heartbeat();
+            chitchat_guard.gc_keys_marked_for_deletion();
 
-        // Drop lock to prevent deadlock in [`UdpSocket::gossip`].
-        drop(chitchat_guard);
+            // Drop lock to prevent deadlock in [`UdpSocket::gossip`].
+            drop(chitchat_guard);
+            result
+        };
 
         info!(selected_nodes=?selected_nodes, "gossip");
         for node in selected_nodes {
@@ -319,7 +327,7 @@ impl Server {
             }
         }
         // Update nodes liveness.
-        let mut chitchat_guard = self.chitchat.lock().await;
+        let mut chitchat_guard = self.chitchat.lock().unwrap();
         chitchat_guard.update_nodes_liveness();
     }
 
@@ -328,9 +336,7 @@ impl Server {
         // here's a deadlock
 
         let syn = {
-            let guard = timeout(Duration::from_millis(400), self.chitchat.lock())
-                .await
-                .with_context(|| "timeout while obtaining lock for gossiping")?;
+            let guard = self.chitchat.lock().unwrap();
             guard.create_syn_message()
         };
 
@@ -583,7 +589,9 @@ mod tests {
         let server_id = server_config.chitchat_id.clone();
         let server_addr = server_config.chitchat_id.gossip_advertise_addr;
         let server_handle = spawn_chitchat(server_config, Vec::new(), &transport).await.unwrap();
-        server_handle.chitchat().lock().await.self_node_state().set("key", "value");
+        {
+            server_handle.chitchat().lock().unwrap().self_node_state().set("key", "value");
+        }
 
         // Add our test socket to the server's nodes.
         server_handle
@@ -633,7 +641,7 @@ mod tests {
         let mut live_nodes_watcher = node1
             .chitchat()
             .lock()
-            .await
+            .unwrap()
             .live_nodes_watch_stream()
             .skip_while(|live_nodes| live_nodes.is_empty());
 

@@ -1,25 +1,30 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::net::UdpSocket;
-use std::time::Instant;
+use std::sync::Arc;
 
 use anyhow::Context;
 use async_channel::Receiver;
 use chitchat::ChitchatMessage;
 use chitchat::Serializable;
 use ed25519_dalek::SigningKey;
-use tracing::info;
 use tracing::warn;
+use tracing::{error, info};
 use wtransport::Connection;
 use wtransport::endpoint::endpoint_side::Client;
 
-use crate::channel::OutgoingMessage;
+use crate::channel::{CHANNEL_CAPACITY, OutgoingMessage};
 
 struct ClientConnectionPool {
     public_addr: SocketAddr,
     signing_key: SigningKey,
     endpoint: wtransport::Endpoint<Client>,
-    connections: HashMap<SocketAddr, Connection>,
+    connections: HashMap<SocketAddr, Arc<ActiveConnection>>,
+}
+
+struct ActiveConnection {
+    task: tokio::task::JoinHandle<()>,
+    message_tx: async_channel::Sender<ChitchatMessage>,
 }
 
 impl ClientConnectionPool {
@@ -34,26 +39,51 @@ impl ClientConnectionPool {
     pub async fn get_or_create_connection(
         &mut self,
         to_addr: SocketAddr,
-    ) -> anyhow::Result<Connection> {
-        let connection = match self.connections.get(&to_addr) {
-            Some(connection) => connection.clone(),
-            None => self.create_connection(to_addr).await?,
-        };
-        Ok(connection)
+    ) -> anyhow::Result<Arc<ActiveConnection>> {
+        if let Some(connection) = self.connections.get(&to_addr).cloned() {
+            if !connection.task.is_finished() {
+                return Ok(connection.clone());
+            }
+        }
+        Ok(self.create_connection(to_addr).await?)
     }
 
-    pub async fn create_connection(&mut self, to_addr: SocketAddr) -> anyhow::Result<Connection> {
+    pub async fn create_connection(
+        &mut self,
+        to_addr: SocketAddr,
+    ) -> anyhow::Result<Arc<ActiveConnection>> {
         warn!("create_connection to {to_addr}");
-        // self.connections
-        //     .entry(to_addr)
-        //     .and_modify(|c| c.close(wtransport::VarInt::from_u32(0), "reconnect".as_bytes()));
         let connection = self.endpoint.connect(format!("https://{to_addr}")).await?;
-        // self.connections.insert(to_addr, connection.clone());
-        Ok(connection)
+        let (message_tx, message_rx) = async_channel::bounded(CHANNEL_CAPACITY);
+        let task = tokio::spawn(handle_connection_outgoing_messages(
+            message_rx,
+            connection,
+            self.public_addr,
+        ));
+        let active_connection = Arc::new(ActiveConnection { message_tx, task });
+        self.connections.insert(to_addr, active_connection.clone());
+        Ok(active_connection)
     }
 
     pub fn open_connections(&self) -> usize {
         self.endpoint.open_connections()
+    }
+}
+
+async fn handle_connection_outgoing_messages(
+    messages_rx: Receiver<ChitchatMessage>,
+    connection: Connection,
+    public_addr: SocketAddr,
+) {
+    loop {
+        if let Ok(message) = messages_rx.recv().await {
+            if let Err(err) = handle_send(&connection, public_addr, &message).await {
+                error!(%err, "failed to send message");
+                break;
+            }
+        } else {
+            break;
+        }
     }
 }
 
@@ -86,30 +116,22 @@ pub async fn run(
         to_addr: SocketAddr,
         message: ChitchatMessage,
     ) -> anyhow::Result<()> {
-        // try use cached connection
-        // let connection = connection_pool
-        //     .get_or_create_connection(to_addr)
-        //     .await
-        //     .with_context(|| "failed to create connection")?;
-        let instant = Instant::now();
-        let connection = connection_pool.create_connection(to_addr).await?;
-        let elapsed = instant.elapsed();
-        info!(elapsed = ?elapsed, "create connection");
+        let connection = connection_pool
+            .get_or_create_connection(to_addr)
+            .await
+            .with_context(|| "failed to create connection")?;
 
         info!(open_connections = connection_pool.open_connections(), "open connections");
 
-        let instant = Instant::now();
-        handle_send(&connection, connection_pool.public_addr, &message).await?;
-        let elapsed = instant.elapsed();
-        info!(elapsed = ?elapsed, destination = ?to_addr, "message sent");
-        // if let Err(err) =
-        //     handle_send(&connection, &message).await.with_context(|| "failed to send message")
-        // {
-        //     // force reconnect
-        //     tracing::warn!(%err, "failed to send message reconnect");
-        //     let connection = connection_pool.create_connection(to_addr).await?;
-        //     handle_send(&connection, &message).await?;
-        // }
+        match connection.message_tx.force_send(message) {
+            Ok(None) => {}
+            Ok(Some(_)) => {
+                error!("message dropped");
+            }
+            Err(_err) => {
+                anyhow::bail!("outgoing channel was closed");
+            }
+        }
         Ok(())
     }
 

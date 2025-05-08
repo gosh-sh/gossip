@@ -14,3 +14,10 @@ wtransport.workspace = true
 async-channel = "2.3"
 ed25519-dalek = { version = "2.1.1", features = ["serde", "rand_core"] }
 rand = "0.8.5"
+
+[dev-dependencies]
+itertools = { version = "0.14.0" }
+tokio-stream = { version = "0.1.17" }
+tracing = { version = "0.1" }
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+once_cell = { version = "1.21" }

@@ -80,9 +80,20 @@ struct ChannelSocket {
 impl Socket for ChannelSocket {
     async fn send(&mut self, to_addr: SocketAddr, message: ChitchatMessage) -> anyhow::Result<()> {
         debug!("send message to {to_addr}");
-        self.outgoing_channel
-            .send(OutgoingMessage { created_at: Instant::now(), to_addr, message })
-            .await?;
+        match self.outgoing_channel.force_send(OutgoingMessage {
+            created_at: Instant::now(),
+            to_addr,
+            message,
+        }) {
+            Ok(None) => {}
+            Ok(Some(_)) => {
+                tracing::warn!("dropped message");
+                return Ok(());
+            }
+            Err(e) => {
+                return Err(e.into());
+            }
+        }
         self.health_report_channel_sender.send(Instant::now())?;
         Ok(())
     }

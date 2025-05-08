@@ -12,7 +12,7 @@ pub use channel::ChannelTransport;
 pub use channel::Statistics;
 pub use udp::UdpSocket;
 pub use udp::UdpTransport;
-pub use utils::TransportExt;
+pub use utils::{DelayMillisDist, TransportExt};
 
 #[async_trait]
 pub trait Transport: Send + Sync + 'static {
