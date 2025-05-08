@@ -84,7 +84,7 @@ async fn test_delay_before_dead_detection_10() {
     // let _ = tracing_subscriber::fmt::try_init();
     let transport = ChannelTransport::with_mtu(65_507);
     let delay = delay_before_detection_sample(40, &transport).await;
-    assert!(delay < Duration::from_secs(10), "Delay exceeded: {:?}", delay);
+    assert!(delay < Duration::from_secs(10), "Delay exceeded: {delay:?}");
 }
 
 #[tokio::test]
@@ -92,7 +92,7 @@ async fn test_delay_before_dead_detection_20() {
     // let _ = tracing_subscriber::fmt::try_init();
     let transport = ChannelTransport::with_mtu(65_507);
     let delay = delay_before_detection_sample(20, &transport).await;
-    assert!(delay < Duration::from_secs(10), "Delay exceeded: {:?}", delay);
+    assert!(delay < Duration::from_secs(10), "Delay exceeded: {delay:?}");
 }
 
 #[tokio::test]
@@ -100,7 +100,7 @@ async fn test_delay_before_dead_detection_40() {
     // let _ = tracing_subscriber::fmt::try_init();
     let transport = ChannelTransport::with_mtu(65_507);
     let delay = delay_before_detection_sample(40, &transport).await;
-    assert!(delay < Duration::from_secs(10), "Delay exceeded: {:?}", delay);
+    assert!(delay < Duration::from_secs(10), "Delay exceeded: {delay:?}");
 }
 
 #[tokio::test]
@@ -108,7 +108,7 @@ async fn test_delay_before_dead_detection_100() {
     // let _ = tracing_subscriber::fmt::try_init();
     let transport = ChannelTransport::with_mtu(65_507);
     let delay = delay_before_detection_sample(100, &transport).await;
-    assert!(delay < Duration::from_secs(10), "Delay exceeded: {:?}", delay);
+    assert!(delay < Duration::from_secs(10), "Delay exceeded: {delay:?}");
 }
 
 #[tokio::test]
@@ -116,7 +116,7 @@ async fn test_delay_before_dead_detection_100_faulty() {
     let _ = tracing_subscriber::fmt::try_init();
     let transport = ChannelTransport::with_mtu(65_507).drop_message(0.5f64);
     let delay = delay_before_detection_sample(100, &*transport).await;
-    assert!(delay < Duration::from_secs(15), "Delay exceeded: {:?}", delay);
+    assert!(delay < Duration::from_secs(15), "Delay exceeded: {delay:?}");
 }
 
 async fn test_bandwidth_aux(num_nodes: usize) -> u64 {

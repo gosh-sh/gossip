@@ -271,36 +271,45 @@ impl Server {
     /// Gossip to multiple randomly chosen nodes.
     async fn gossip_multiple(&mut self) {
         // Gossip with live nodes & probabilistically include a random dead node
-        let mut chitchat_guard = self.chitchat.lock().await;
-        let cluster_state = chitchat_guard.cluster_state();
 
-        let peer_nodes = cluster_state
-            .nodes()
-            .filter(|chitchat_id| *chitchat_id != chitchat_guard.self_chitchat_id())
-            .map(|chitchat_id| chitchat_id.gossip_advertise_addr)
-            .collect::<HashSet<_>>();
-        let live_nodes = chitchat_guard
-            .live_nodes()
-            .filter(|chitchat_id| *chitchat_id != chitchat_guard.self_chitchat_id())
-            .map(|chitchat_id| chitchat_id.gossip_advertise_addr)
-            .collect::<HashSet<_>>();
-        let dead_nodes = chitchat_guard
-            .dead_nodes()
-            .map(|chitchat_id| chitchat_id.gossip_advertise_addr)
-            .collect::<HashSet<_>>();
-        let seed_nodes: HashSet<SocketAddr> = chitchat_guard
-            .seed_nodes()
-            .into_iter()
-            .filter(|addr| *addr != chitchat_guard.self_chitchat_id().gossip_advertise_addr)
-            .collect();
-        let (selected_nodes, random_dead_node_opt, random_seed_node_opt) =
-            select_nodes_for_gossip(&mut self.rng, peer_nodes, live_nodes, dead_nodes, seed_nodes);
+        let (selected_nodes, random_dead_node_opt, random_seed_node_opt) = {
+            let mut chitchat_guard = self.chitchat.lock().await;
+            let cluster_state = chitchat_guard.cluster_state();
+            let peer_nodes = cluster_state
+                .nodes()
+                .filter(|chitchat_id| *chitchat_id != chitchat_guard.self_chitchat_id())
+                .map(|chitchat_id| chitchat_id.gossip_advertise_addr)
+                .collect::<HashSet<_>>();
+            let live_nodes = chitchat_guard
+                .live_nodes()
+                .filter(|chitchat_id| *chitchat_id != chitchat_guard.self_chitchat_id())
+                .map(|chitchat_id| chitchat_id.gossip_advertise_addr)
+                .collect::<HashSet<_>>();
+            let dead_nodes = chitchat_guard
+                .dead_nodes()
+                .map(|chitchat_id| chitchat_id.gossip_advertise_addr)
+                .collect::<HashSet<_>>();
+            let seed_nodes: HashSet<SocketAddr> = chitchat_guard
+                .seed_nodes()
+                .into_iter()
+                .filter(|addr| *addr != chitchat_guard.self_chitchat_id().gossip_advertise_addr)
+                .collect();
+            let (selected_nodes, random_dead_node_opt, random_seed_node_opt) =
+                select_nodes_for_gossip(
+                    &mut self.rng,
+                    peer_nodes,
+                    live_nodes,
+                    dead_nodes,
+                    seed_nodes,
+                );
 
-        chitchat_guard.update_self_heartbeat();
-        chitchat_guard.gc_keys_marked_for_deletion();
+            chitchat_guard.update_self_heartbeat();
+            chitchat_guard.gc_keys_marked_for_deletion();
+            (selected_nodes, random_dead_node_opt, random_seed_node_opt)
+        };
 
-        // Drop lock to prevent deadlock in [`UdpSocket::gossip`].
-        drop(chitchat_guard);
+        // // Drop lock to prevent deadlock in [`UdpSocket::gossip`].
+        // drop(chitchat_guard);
 
         info!(selected_nodes=?selected_nodes, "gossip");
         for node in selected_nodes {

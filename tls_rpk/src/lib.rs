@@ -76,7 +76,7 @@ pub mod client {
     pub fn run_client(config: ClientConfig, port: u16) -> Result<String, io::Error> {
         let server_name = "0.0.0.0".try_into().unwrap();
         let mut conn = ClientConnection::new(Arc::new(config), server_name).unwrap();
-        let mut sock = TcpStream::connect(format!("[::]:{}", port)).unwrap();
+        let mut sock = TcpStream::connect(format!("[::]:{port}")).unwrap();
         let mut tls = Stream::new(&mut conn, &mut sock);
 
         let mut buf = vec![0; 128];

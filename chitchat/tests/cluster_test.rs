@@ -575,7 +575,7 @@ async fn test_simple_simulation_heavy_insert_delete() {
     let mut simulator = Simulator::new(Duration::from_millis(100), Duration::from_secs(5));
     let mut chitchat_ids = Vec::new();
     for i in 0..20 {
-        chitchat_ids.push(create_chitchat_id(&format!("node-{}", i)));
+        chitchat_ids.push(create_chitchat_id(&format!("node-{i}")));
     }
     let seeds = vec![chitchat_ids[0].clone(), chitchat_ids[1].clone(), chitchat_ids[2].clone()];
 
@@ -588,7 +588,7 @@ async fn test_simple_simulation_heavy_insert_delete() {
         .collect();
     simulator.execute(add_node_operations).await;
 
-    let key_names: Vec<_> = (0..200).map(|idx| format!("key_{}", idx)).collect();
+    let key_names: Vec<_> = (0..200).map(|idx| format!("key_{idx}")).collect();
     let mut keys_values_inserted_per_chitchat_id: HashMap<ChitchatId, HashSet<String>> =
         HashMap::new();
     for chitchat_id in chitchat_ids.iter() {

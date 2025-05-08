@@ -37,17 +37,15 @@ pub struct ChannelTransport {
     counter: atomic::AtomicU16,
     incoming_source: Receiver<IncomingMessage>,
     outgoing_source: Sender<OutgoingMessage>,
-    health_report_channel_sender: tokio::sync::watch::Sender<Instant>,
 }
 
 impl ChannelTransport {
     pub fn new(
         incoming_source: Receiver<IncomingMessage>,
         outgoing_source: Sender<OutgoingMessage>,
-        health_report_channel_sender: tokio::sync::watch::Sender<Instant>,
     ) -> Self {
         let counter = atomic::AtomicU16::new(0);
-        Self { counter, incoming_source, outgoing_source, health_report_channel_sender }
+        Self { counter, incoming_source, outgoing_source }
     }
 }
 
@@ -58,13 +56,7 @@ impl Transport for ChannelTransport {
         let id = self.counter.load(Ordering::SeqCst);
         let incoming_channel = self.incoming_source.clone();
         let outgoing_channel = self.outgoing_source.clone();
-        let health_report_channel_sender = self.health_report_channel_sender.clone();
-        Ok(Box::new(ChannelSocket {
-            id,
-            incoming_channel,
-            outgoing_channel,
-            health_report_channel_sender,
-        }))
+        Ok(Box::new(ChannelSocket { id, incoming_channel, outgoing_channel }))
     }
 }
 
@@ -73,7 +65,6 @@ struct ChannelSocket {
     id: u16,
     incoming_channel: Receiver<IncomingMessage>,
     outgoing_channel: Sender<OutgoingMessage>,
-    health_report_channel_sender: tokio::sync::watch::Sender<Instant>,
 }
 
 #[async_trait]
@@ -83,7 +74,6 @@ impl Socket for ChannelSocket {
         self.outgoing_channel
             .send(OutgoingMessage { created_at: Instant::now(), to_addr, message })
             .await?;
-        self.health_report_channel_sender.send(Instant::now())?;
         Ok(())
     }
 
@@ -115,7 +105,6 @@ impl Socket for ChannelSocket {
             incoming_message.message.serialized_len()
         );
 
-        self.health_report_channel_sender.send(Instant::now())?;
         Ok((incoming_message.from_addr, incoming_message.message))
     }
 }
