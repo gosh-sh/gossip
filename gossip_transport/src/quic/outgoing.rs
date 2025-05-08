@@ -15,6 +15,7 @@ use wtransport::endpoint::endpoint_side::Client;
 
 use crate::channel::OutgoingMessage;
 
+#[allow(unused)]
 struct ClientConnectionPool {
     public_addr: SocketAddr,
     signing_key: SigningKey,
@@ -130,7 +131,6 @@ pub async fn run(
     }
 }
 
-#[must_use]
 async fn handle_send(
     connection: &Connection,
     from_addr: SocketAddr,

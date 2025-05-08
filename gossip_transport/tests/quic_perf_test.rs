@@ -136,7 +136,7 @@ async fn test_delay_before_dead_detection_10() {
         transports.iter().map(|t| &t.transport as &dyn Transport).collect(),
     )
     .await;
-    assert!(delay < Duration::from_secs(10), "Delay exceeded: {:?}", delay);
+    assert!(delay < Duration::from_secs(10), "Delay exceeded: {delay:?}");
 
     for transport in transports {
         transport.quic_handler.abort();
@@ -158,7 +158,7 @@ async fn test_delay_before_dead_detection_40() {
         transports.iter().map(|t| &t.transport as &dyn Transport).collect(),
     )
     .await;
-    assert!(delay < Duration::from_secs(10), "Delay exceeded: {:?}", delay);
+    assert!(delay < Duration::from_secs(10), "Delay exceeded: {delay:?}");
 
     for transport in transports {
         transport.quic_handler.abort();

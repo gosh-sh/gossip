@@ -586,7 +586,7 @@ mod tests {
         let mut node2 = Chitchat::with_chitchat_id_and_seeds(node_config2, empty_seeds, vec![]);
         // Because of compression, we need a lot of keys to reach the MTU.
         for i in 0..20_000 {
-            let key = format!("k{}", i);
+            let key = format!("k{i}");
             node1.self_node_state().set(&key, "first_value");
         }
         for _ in 0..2 {
